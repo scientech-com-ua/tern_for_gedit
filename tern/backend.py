@@ -1,28 +1,16 @@
 # vim: set shiftwidth=2 tabstop=2 noexpandtab textwidth=80 wrap :
 
+import os
 import json
-from urllib import request
 from subprocess import Popen, PIPE
 from .filter import filter_completions
 
-opener = request.build_opener(request.ProxyHandler({}))
-
-def ensure_server(retry = False):
-	try:
-		return open(".tern-port").read()
-	except IOError as e:
-		if retry:
-			raise e
-		server = Popen("tern", stdin=PIPE, stdout=PIPE, stderr=PIPE)
-		server.stdout.readline()
-		return ensure_server(True)
+server = Popen(["node", os.path.dirname(os.path.abspath(__file__)) + "/server.js"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
 def req(doc):
-	port = ensure_server()
-	doc = json.dumps(doc).encode("utf-8")
-
-	r = opener.open("http://localhost:" + str(port) + "/", doc, 1)
-	return json.loads(r.read().decode("utf-8"))
+	server.stdin.write(json.dumps(doc).encode("utf-8"))
+	server.stdin.flush()
+	return json.loads(server.stdout.readline().decode("utf-8"))
 
 
 class TernBackend():

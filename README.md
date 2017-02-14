@@ -1,7 +1,8 @@
-# tern_for_gedit
+# tern_for_gedit (piped)
 
-This is a simple gedit plugin that provides code completion results
-based on [tern](https://github.com/marijnh/tern).
+This is modified gedit plugin of [tern_for_gedit](https://github.com/Swatinem/tern_for_gedit) that provides code completion results
+based on [tern](https://github.com/marijnh/tern). Only one difference is that it
+uses STDIN/STDOUT streams instead of localhost-ed http server. This is fixes troubles with ".tern-port" file lookup.
 
 Simply type to get identifier completion. Or force a completion popup by
 pressing `<Ctrl>+Space`.
