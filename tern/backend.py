@@ -10,7 +10,10 @@ server = Popen(["node", os.path.dirname(os.path.abspath(__file__)) + "/server.js
 def req(doc):
 	server.stdin.write(json.dumps(doc).encode("utf-8"))
 	server.stdin.flush()
-	return json.loads(server.stdout.readline().decode("utf-8"))
+	try:
+		return json.loads(server.stdout.readline().decode("utf-8"))
+	except Error:
+		return ()
 
 
 class TernBackend():

@@ -21,7 +21,8 @@ var process = require ('process'),
       dependencyBudget: tern.defaultOptions.dependencyBudget
     },
     projects = {},
-    projectDirByFileName = {};
+    projectDirByFileName = {},
+    fakeServer = {request: function(){process.stdout.write("\n");}};
 
 process.stdin.setEncoding('utf8');
 process.stdin.resume();
@@ -34,6 +35,10 @@ process.stdin.on('data', (chunk) => {
     process.stdout.write(JSON.stringify(data));
     process.stdout.write("\n");
   });    
+});
+
+process.on('uncaughtException', (err) => {
+  fs.appendFile(path.resolve(homeDir, '.tern-error'), err.toString()+"\n");
 });
 
 function findByPartKey(partKey, obj) {
@@ -109,11 +114,8 @@ function findDefs(projectDir, config) {
 
 function server(file) {
   var projectDir, config;
-  if (projectDirByFileName[file]) {
-    return projects[projectDirByFileName[file]];
-  }
   do {
-    projectDir = path.dirname(projectDir || file);
+    projectDir = projectDirByFileName[file] || path.dirname(projectDir || file);
     try {
       if (projectDir in projects) {
         return projects[projectDir];
@@ -134,35 +136,40 @@ function server(file) {
     }
   } while (true);
 
-  var server = new tern.Server({
-    getFile: function(name, c) {
-      if (config.dontLoad && config.dontLoad.some(function(pat) {return minimatch(name, pat)}))
-        c(null, "");
-      else
-        fs.readFile(path.resolve(projectDir, name), "utf8", c);
-    },
-    normalizeFilename: function(name) {
-      var pt = path.resolve(projectDir, name)
-      try { pt = fs.realPathSync(path.resolve(projectDir, name), true) }
-      catch(e) {}
-      return path.relative(projectDir, pt)
-    },
-    async: true,
-    defs: findDefs(projectDir, config),
-    plugins: loadPlugins(projectDir, config),
-    debug: false,
-    projectDir: projectDir,
-    ecmaVersion: config.ecmaVersion,
-    dependencyBudget: config.dependencyBudget,
-    stripCRs: false,
-    parent: {}
-  });
-
-  if (config.loadEagerly) config.loadEagerly.forEach(function(pat) {
-    glob.sync(pat, { cwd: projectDir }).forEach(function(file) {
-      server.addFile(file);
+  try {
+    var server = new tern.Server({
+      getFile: function(name, c) {
+        if (config.dontLoad && config.dontLoad.some(function(pat) {return minimatch(name, pat)}))
+          c(null, "");
+        else
+          fs.readFile(path.resolve(projectDir, name), "utf8", c);
+      },
+      normalizeFilename: function(name) {
+        var pt = path.resolve(projectDir, name)
+        try { pt = fs.realPathSync(path.resolve(projectDir, name), true) }
+        catch(e) {}
+        return path.relative(projectDir, pt)
+      },
+      async: true,
+      defs: findDefs(projectDir, config),
+      plugins: loadPlugins(projectDir, config),
+      debug: false,
+      projectDir: projectDir,
+      ecmaVersion: config.ecmaVersion,
+      dependencyBudget: config.dependencyBudget,
+      stripCRs: false,
+      parent: {}
     });
-  });
-  return projects[projectDir] = server;
+
+    if (config.loadEagerly) config.loadEagerly.forEach(function(pat) {
+      glob.sync(pat, { cwd: projectDir }).forEach(function(file) {
+        server.addFile(file);
+      });
+    });
+    return projects[projectDir] = server;
+  } catch (error) {
+    fs.appendFile(path.resolve(homeDir, '.tern-error'), error.toString()+"\n");
+    return fakeServer;
+  }
 }
 
